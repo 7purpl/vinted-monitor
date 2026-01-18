@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Monitor Vinted — Pokémon</title>
+
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #f2f2f2;
+      padding: 20px;
+    }
+    .item {
+      background: white;
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    img {
+      width: 100px;
+      height: 100px;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button {
+      padding: 8px 15px;
+      background: #00b2b2;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #008c8c;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Monitor Vinted Pokémon (temps réel)</h1>
+  <div id="items"></div>
+
+  <script>
+    const socket = io();
+
+    socket.on("new_items", (items) => {
+      items.forEach(addItem);
+    });
+
+    function addItem(item) {
+      const div = document.createElement("div");
+      div.className = "item";
+
+      div.innerHTML = `
+        <img src="${item.img}" onclick="openImg('${item.img}')">
+        <div>
+          <h3>${item.title}</h3>
+          <p>${item.price}</p>
+        </div>
+        <a href="${item.link}" target="_blank">
+          <button>Acheter</button>
+        </a>
+      `;
+
+      document.getElementById("items").prepend(div);
+    }
+
+    function openImg(src) {
+      window.open(src, "_blank");
+    }
+  </script>
+
+</body>
+</html>
