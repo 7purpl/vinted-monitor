@@ -1,64 +1,36 @@
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
-const http = require("http");
-const { Server } = require("socket.io");
+const cors = require("cors");
 
 const app = express();
-const server = http.createServer(app);
-
-const io = new Server(server, {
-  cors: { origin: "*" }
-});
-
+app.use(cors());
 app.use(express.static("public"));
 
-/* ------------------------------------------------------
-   🔒 CACHE LIMITÉ → empêche fuite mémoire (RAM stable)
-------------------------------------------------------- */
 let cache = [];
-const CACHE_LIMIT = 5000;
+const CACHE_LIMIT = 3000;
 
 function addToCache(id) {
   cache.push(id);
-  if (cache.length > CACHE_LIMIT) {
-    cache.shift(); // supprime les plus anciennes entrées
-  }
+  if (cache.length > CACHE_LIMIT) cache.shift();
 }
 
 function isInCache(id) {
   return cache.includes(id);
 }
 
-/* ------------------------------------------------------
-   🔄 SCRAPER VINTED
-------------------------------------------------------- */
-async function fetchVinted() {
+async function scrape() {
   try {
     const url =
       "https://www.vinted.fr/catalog?search_text=cartes%20pokemon&price_from=1.1&currency=EUR&page=1&order=newest_first";
 
-    const { data } = await axios.get(url, {
-      timeout: 8000,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
-      }
-    });
-
+    const { data } = await axios.get(url);
     const $ = cheerio.load(data);
-    let newItems = [];
 
-    const items = $("[data-testid='item-box']");
+    let items = [];
 
-    if (items.length === 0) {
-      console.log("⚠️ Vinted n’a retourné aucun item. Temp block probable.");
-      return;
-    }
-
-    items.each((_, el) => {
-      const id = $(el).attr("data-id");
-      if (!id) return;
+    $("[data-testid='item-box']").each((i, el) => {
+      const id = $(el).attr("data-testid") + "-" + i;
 
       if (!isInCache(id)) {
         addToCache(id);
@@ -71,29 +43,40 @@ async function fetchVinted() {
           $(el).find("img").attr("data-src") ||
           "";
 
-        newItems.push({ id, title, price, img, link });
+        items.push({ id, title, price, img, link });
       }
     });
 
-    if (newItems.length > 0) {
-      io.emit("new_items", newItems);
-      console.log("✨ Nouvelles annonces :", newItems.length);
-    }
-
-    // Garbage Collector manuel si dispo
-    if (global.gc) global.gc();
-
+    return items;
   } catch (e) {
-    console.log("❌ Erreur scraping :", e.message);
-    // On ne crash JAMAIS — Render reste UP
+    console.log("Scrape error:", e.message);
+    return [];
   }
 }
 
-// Toutes les 3.5 secondes (= safe pour Vinted + Render)
-setInterval(fetchVinted, 3500);
+let lastPush = [];
 
-/* ------------------------------------------------------
-   🚀 DÉMARRAGE SERVEUR
-------------------------------------------------------- */
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("🚀 Monitor running on port " + PORT));
+app.get("/api", async (req, res) => {
+  res.json(lastPush);
+});
+
+// HEALTH CHECK (important Render)
+app.get("/", (req, res) => {
+  res.send("OK");
+});
+
+// interval de scraping stabilisé
+setInterval(async () => {
+  const items = await scrape();
+
+  if (items.length) {
+    lastPush = items;
+    console.log("Nouveaux items :", items.length);
+  }
+
+  if (global.gc) global.gc();
+}, 3500);
+
+// PORT
+const PORT = process.env.PORT ? Number(process.env.PORT) : 10000;
+app.listen(PORT, () => console.log("Monitor running on port " + PORT));
