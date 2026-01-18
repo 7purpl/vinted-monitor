@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <title>Monitor Vinted — Pokémon</title>
-
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 
   <style>
@@ -59,7 +58,7 @@
       div.className = "item";
 
       div.innerHTML = `
-        <img src="${item.img}" onclick="openImg('${item.img}')">
+        <img src="${item.img}" onclick="window.open('${item.img}', '_blank')">
         <div>
           <h3>${item.title}</h3>
           <p>${item.price}</p>
@@ -70,10 +69,6 @@
       `;
 
       document.getElementById("items").prepend(div);
-    }
-
-    function openImg(src) {
-      window.open(src, "_blank");
     }
   </script>
 
